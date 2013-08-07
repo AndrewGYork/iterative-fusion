@@ -156,72 +156,52 @@ for i in range(num_iterations):
 ##    raw_input('Hit enter to continue...')
 print "Done deconvolving"
 
-##"""
-##If our new deonvolution is worth anything, it has to compare favorably
-##to existing methods. The standard way to process MSIM data is using
-##Enderlein's trick, followed by standard deconvolution.
-##
-##First, execute Enderlein's trick on the noisy MSIM data.
-##"""
-##aligned_msim_data = shift_msim_data(noisy_msim_data)
-##enderlein_image = aligned_msim_data.sum(axis=(2, 3))
-##array_to_tif(enderlein_image.reshape((1,) + enderlein_image.shape
-##                                     ).astype(np.float32),
-##             outfile='enderlein_image.tif')
-##"""
-##Next, make MSIM data for a pointlike object, and execute Enderlein's
-##trick to get an MSIM PSF
-##"""
-##pointlike_object = np.zeros_like(actual_object)
-##pointlike_object[pointlike_object.shape[0]//2,
-##                 pointlike_object.shape[1]//2] = 1
-##pointlike_msim_data = density_to_msim_data(pointlike_object)
-##aligned_pointlike_msim_data = shift_msim_data(pointlike_msim_data)
-##enderlein_psf = aligned_pointlike_msim_data.sum(axis=(2, 3))
-##array_to_tif(enderlein_psf.reshape((1,) + enderlein_psf.shape
-##                                     ).astype(np.float32),
-##             outfile='enderlein_psf.tif')
-##
-##"""
-##Now process the Enderlein image with standard Richardson-Lucy deconvolution.
-##"""
-##measurement = enderlein_image
-##print measurement.min(), measurement.max(), measurement.dtype
-##estimate = np.ones_like(enderlein_image)
-##correction_factor = np.zeros_like(estimate)
-##
-##estimate_history = np.zeros((num_iterations + 1,) + enderlein_image.shape,
-##                               dtype=np.float64)
-##estimate_history[0, :, :] = estimate
-##print "Deconvolving Enderlein image..."
-##for i in range(num_iterations):
-##    print " Iteration", i
-####    blurred_estimate = fftconvolve(estimate, enderlein_psf, mode='same')
-##    gaussian_filter(
-##        estimate,
-##        sigma=np.sqrt(1.0/((1.0/emission_sigma**2) +
-##                           (1.0/illumination_sigma**2))),
-##        output=blurred_estimate)
-##    print " Done blurring."
-##    print " Computing correction ratio..."
-##    np.divide(measurement, blurred_estimate + 1e-6, out=correction_factor)
-##    print " Blurring correction ratio..."
-####    correction_factor = fftconvolve(
-####        correction_factor, enderlein_psf, mode='same')
-##    gaussian_filter(
-##        correction_factor,
-##        sigma=np.sqrt(1.0/((1.0/emission_sigma**2) +
-##                           (1.0/illumination_sigma**2))),
-##        output=correction_factor)
-##    print " Done blurring."
-##    np.multiply(estimate, correction_factor, out=estimate)
-##    estimate_history[i+1, :, :] = estimate
-##    print " Saving history..."
-##    array_to_tif(estimate_history.astype(np.float32),
-##                 'estimate_history_enderlein.tif')
-##    print " Saving estimate..."
-##    array_to_tif(estimate.reshape((1,)+estimate.shape).astype(np.float32),
-##                 'estimate_enderlein.tif')
-##print "Done deconvolving"
-##
-##
+"""
+If this deonvolution is worth anything, it has to compare favorably to
+existing methods. For example, if we just add the two views, and
+deconvolve with an appropriate PSF, do we get the same image?
+
+First, make multiview data for a pointlike object, and sum the images.
+"""
+pointlike_object = np.zeros_like(actual_object)
+pointlike_object[pointlike_object.shape[0]//2,
+                 pointlike_object.shape[1]//2] = 1
+pointlike_multiview_data = density_to_multiview_data(pointlike_object)
+summed_multiview_psf = pointlike_multiview_data.mean(axis=0)
+array_to_tif(summed_multiview_psf.reshape((1,) + summed_multiview_psf.shape
+                                     ).astype(np.float32),
+             outfile='summed_multiview_psf.tif')
+
+"""
+Now process the summed multiview image with standard Richardson-Lucy
+deconvolution.
+"""
+measurement = noisy_multiview_data.mean(axis=0)
+print measurement.min(), measurement.max(), measurement.dtype
+estimate = np.ones_like(actual_object)
+correction_factor = np.zeros_like(estimate)
+
+estimate_history = np.zeros((num_iterations + 1,) + estimate.shape,
+                               dtype=np.float64)
+estimate_history[0, :, :] = estimate
+print "Deconvolving summed multiview image..."
+for i in range(num_iterations):
+    print " Iteration", i
+    blurred_estimate = fftconvolve(estimate, summed_multiview_psf, mode='same')
+    print " Done blurring."
+    print " Computing correction ratio..."
+    np.divide(measurement, blurred_estimate + 1e-6, out=correction_factor)
+    print " Blurring correction ratio..."
+    correction_factor = fftconvolve(
+        correction_factor, summed_multiview_psf, mode='same')
+    print " Done blurring."
+    np.multiply(estimate, correction_factor, out=estimate)
+    estimate_history[i+1, :, :] = estimate
+    print " Saving history..."
+    array_to_tif(estimate_history.astype(np.float32),
+                 'estimate_history_summed_multiview.tif')
+    print " Saving estimate..."
+    array_to_tif(estimate.reshape((1,)+estimate.shape).astype(np.float32),
+                 'estimate_summed_multiview.tif')
+print "Done deconvolving"
+
