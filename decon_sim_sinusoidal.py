@@ -180,3 +180,15 @@ for i in range(num_iterations):
     print "Done saving."
 ##    raw_input('Hit enter to continue...')
 print "Done deconvolving"
+
+"""
+Make SIM data for a pointlike object
+"""
+pointlike_object = np.zeros_like(actual_object)
+pointlike_object[pointlike_object.shape[0]//2,
+                 pointlike_object.shape[1]//2] = 1
+array_to_tif(pointlike_object.reshape((1,) + pointlike_object.shape
+                                      ).astype(np.float32),
+             outfile='pointlike_object.tif')
+pointlike_sim_data = density_to_sim_data(pointlike_object)
+sim_data_to_visualization(pointlike_sim_data, outfile='pointlike_sim_data.tif')
