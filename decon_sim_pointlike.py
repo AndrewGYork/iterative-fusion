@@ -2,12 +2,13 @@ import numpy as np
 from simple_tif import tif_to_array, array_to_tif
 from scipy.ndimage import gaussian_filter, interpolation
 from scipy.signal import fftconvolve
+import time
 
-msim_data_radius = 12
-illumination_sigma = 3.
+msim_data_radius = 16
+illumination_sigma = 4.
 emission_sigma = illumination_sigma
 num_iterations = 200
-intensity_scaling = 0.003
+intensity_scaling = 0.5
 
 def density_to_msim_data(density, out=None):
     """
@@ -152,13 +153,13 @@ def shift_msim_data(msim_data, out=None):
 Load and truncate the object
 """
 print "Loading resolution_target.tif..."
-actual_object = tif_to_array('resolution_target-2.tif'
+actual_object = tif_to_array('ladder_complete.tif'
                              )[0, :, :].astype(np.float64)
 print "Done loading."
 print "Apodizing resolution target..."
 mask = np.zeros_like(actual_object)
-trim_size = 40
-blur_size = 10
+trim_size = 20#40
+blur_size = 2#10
 mask[trim_size:-trim_size, trim_size:-trim_size] = 1
 gaussian_filter(mask, sigma=blur_size, output=mask)
 array_to_tif(
@@ -309,12 +310,21 @@ for i in range(num_iterations):
     print " Done blurring."
     np.multiply(estimate, correction_factor, out=estimate)
     estimate_history[i+1, :, :] = estimate
-    print " Saving history..."
-    array_to_tif(estimate_history.astype(np.float32),
-                 'estimate_history_enderlein.tif')
-    print " Saving estimate..."
-    array_to_tif(estimate.reshape((1,)+estimate.shape).astype(np.float32),
-                 'estimate_enderlein.tif')
+    for i in range(3):
+        try:
+            print " Saving history..."
+            array_to_tif(estimate_history.astype(np.float32),
+                         'estimate_history_enderlein.tif')
+            print " Saving estimate..."
+            array_to_tif(estimate.reshape((1,)+estimate.shape
+                                          ).astype(np.float32),
+                         'estimate_enderlein.tif')
+            break
+        except IOError:
+            print "IO Error, trying again..."
+            time.sleep(1)
+            continue
+    else:
+        raise UserWarning("Three consecutive IO errors. :(")
 print "Done deconvolving"
-
 
