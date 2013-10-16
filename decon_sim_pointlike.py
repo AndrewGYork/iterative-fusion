@@ -250,20 +250,24 @@ for i in range(num_iterations):
 print "Done deconvolving"
 
 """
-If our new deonvolution is worth anything, it has to compare favorably
+If our new deconvolution is worth anything, it has to compare favorably
 to existing methods. The standard way to process MSIM data is using
 Enderlein's trick, followed by standard deconvolution.
+
+We'd also better compare favorably to deconvolution of the widefield
+image.
 
 First, execute Enderlein's trick on the noisy MSIM data.
 """
 aligned_msim_data = shift_msim_data(noisy_msim_data)
 enderlein_image = aligned_msim_data.sum(axis=(2, 3))
+widefield_image = noisy_msim_data.sum(axis=(2, 3))
 array_to_tif(enderlein_image.reshape((1,) + enderlein_image.shape
                                      ).astype(np.float32),
              outfile='enderlein_image.tif')
 """
-Next, make MSIM data for a pointlike object, and execute Enderlein's
-trick to get an MSIM PSF
+Next, make MSIM and widefield data for a pointlike object, execute
+Enderlein's trick to get an MSIM PSF, and sum to get a widefield PSF
 """
 pointlike_object = np.zeros_like(actual_object)
 pointlike_object[pointlike_object.shape[0]//2,
@@ -271,54 +275,82 @@ pointlike_object[pointlike_object.shape[0]//2,
 pointlike_msim_data = density_to_msim_data(pointlike_object)
 aligned_pointlike_msim_data = shift_msim_data(pointlike_msim_data)
 enderlein_psf = aligned_pointlike_msim_data.sum(axis=(2, 3))
+widefield_psf = pointlike_msim_data.sum(axis=(2, 3))
 array_to_tif(enderlein_psf.reshape((1,) + enderlein_psf.shape
                                      ).astype(np.float32),
              outfile='enderlein_psf.tif')
+array_to_tif(widefield_psf.reshape((1,) + widefield_psf.shape
+                                     ).astype(np.float32),
+             outfile='widefield_psf.tif')
 
 """
-Now process the Enderlein image with standard Richardson-Lucy deconvolution.
+Now process the Enderlein image and the widefield image with standard
+Richardson-Lucy deconvolution.
 """
-measurement = enderlein_image
-print measurement.min(), measurement.max(), measurement.dtype
-estimate = np.ones_like(enderlein_image)
-blurred_estimate = np.zeros_like(estimate)
-correction_factor = np.zeros_like(estimate)
+enderlein_measurement = enderlein_image
+widefield_measurement = widefield_image
+enderlein_estimate = np.ones_like(enderlein_image)
+widefield_estimate = np.ones_like(widefield_image)
+blurred_enderlein_estimate = np.zeros_like(enderlein_estimate)
+blurred_widefield_estimate = np.zeros_like(widefield_estimate)
+enderlein_correction_factor = np.zeros_like(enderlein_estimate)
+widefield_correction_factor = np.zeros_like(widefield_estimate)
 
-estimate_history = np.zeros((num_iterations + 1,) + enderlein_image.shape,
-                               dtype=np.float64)
-estimate_history[0, :, :] = estimate
-print "Deconvolving Enderlein image..."
+enderlein_estimate_history = np.zeros(
+    (num_iterations + 1,) + enderlein_image.shape, dtype=np.float64)
+widefield_estimate_history = np.zeros(
+    (num_iterations + 1,) + widefield_image.shape, dtype=np.float64)
+enderlein_estimate_history[0, :, :] = enderlein_estimate
+widefield_estimate_history[0, :, :] = widefield_estimate
+print "Deconvolving Enderlein and widefield images..."
 for i in range(num_iterations):
     print " Iteration", i
-##    blurred_estimate = fftconvolve(estimate, enderlein_psf, mode='same')
     gaussian_filter(
-        estimate,
+        enderlein_estimate,
         sigma=np.sqrt(1.0/((1.0/emission_sigma**2) +
                            (1.0/illumination_sigma**2))),
-        output=blurred_estimate)
+        output=blurred_enderlein_estimate)
+    widefield_blurred_estimate = fftconvolve(
+        widefield_estimate, widefield_psf, mode='same')
     print " Done blurring."
     print " Computing correction ratio..."
-    np.divide(measurement, blurred_estimate + 1e-6, out=correction_factor)
+    np.divide(enderlein_measurement,
+              blurred_enderlein_estimate + 1e-6,
+              out=enderlein_correction_factor)
+    np.divide(widefield_measurement,
+              widefield_blurred_estimate + 1e-6,
+              out=widefield_correction_factor)
     print " Blurring correction ratio..."
-##    correction_factor = fftconvolve(
-##        correction_factor, enderlein_psf, mode='same')
     gaussian_filter(
-        correction_factor,
+        enderlein_correction_factor,
         sigma=np.sqrt(1.0/((1.0/emission_sigma**2) +
                            (1.0/illumination_sigma**2))),
-        output=correction_factor)
+        output=enderlein_correction_factor)
+    widefield_correction_factor = fftconvolve(
+        widefield_correction_factor, widefield_psf, mode='same')
     print " Done blurring."
-    np.multiply(estimate, correction_factor, out=estimate)
-    estimate_history[i+1, :, :] = estimate
+    np.multiply(enderlein_estimate,
+                enderlein_correction_factor,
+                out=enderlein_estimate)
+    np.multiply(widefield_estimate,
+                widefield_correction_factor,
+                out=widefield_estimate)
+    enderlein_estimate_history[i+1, :, :] = enderlein_estimate
+    widefield_estimate_history[i+1, :, :] = widefield_estimate
     for i in range(3):
         try:
             print " Saving history..."
-            array_to_tif(estimate_history.astype(np.float32),
+            array_to_tif(enderlein_estimate_history.astype(np.float32),
                          'estimate_history_enderlein.tif')
+            array_to_tif(widefield_estimate_history.astype(np.float32),
+                         'estimate_history_widefield.tif')
             print " Saving estimate..."
-            array_to_tif(estimate.reshape((1,)+estimate.shape
-                                          ).astype(np.float32),
+            array_to_tif(enderlein_estimate.reshape(
+                (1,)+enderlein_estimate.shape).astype(np.float32),
                          'estimate_enderlein.tif')
+            array_to_tif(widefield_estimate.reshape(
+                (1,)+widefield_estimate.shape).astype(np.float32),
+                         'estimate_widefield.tif')
             break
         except IOError:
             print "IO Error, trying again..."
@@ -327,4 +359,3 @@ for i in range(num_iterations):
     else:
         raise UserWarning("Three consecutive IO errors. :(")
 print "Done deconvolving"
-
