@@ -12,7 +12,7 @@ pointlike_object[pointlike_object.shape[0]//2,
 print "Done loading."
 
 num_timepoints = 10
-sigma_range = np.linspace(15, 4, num_timepoints)
+sigma_range = np.linspace(7.5, 2, num_timepoints)
 signal_range = np.linspace(1, .1, num_timepoints)
 blurred_object = np.zeros(
     (num_timepoints,) + actual_object.shape, dtype=np.float64)
@@ -41,7 +41,7 @@ print " Seeding random number generator with value: 0"
 np.random.seed(0) #For now, we want repeatably random
 for p in range(num_timepoints):
     print " Adding Poisson noise to slice", p
-    noisy_object[p, :, :] = np.random.poisson(lam=blurred_object[p, :, :])
+    noisy_object[p, :, :] = np.random.poisson(lam=0.5*blurred_object[p, :, :])
 print "Saving noisy_object.tif"
 array_to_tif(noisy_object.astype(np.float32), 'noisy_object.tif')
 print "Done saving."
@@ -63,7 +63,7 @@ estimate = np.ones(actual_object.shape, dtype=np.float64)
 blurred_estimate = np.zeros(blurred_object.shape, dtype=np.float64)
 correction_factor = np.zeros_like(blurred_estimate)
 
-num_iterations = 80
+num_iterations = 30
 estimate_history = np.zeros((num_iterations + 1,) + actual_object.shape,
                                dtype=np.float64)
 estimate_history[0, :, :] = estimate
