@@ -2,12 +2,12 @@ import numpy as np
 from simple_tif import tif_to_array, array_to_tif
 from scipy.ndimage import gaussian_filter
 
-num_rotations = 3
+num_rotations = 5
 num_phases = 5
-illumination_period = 15.
+illumination_period = 30.
 emission_fwhm = 0.5 * illumination_period
-num_iterations = 200
-intensity_scaling = 0.03
+num_iterations = 100
+intensity_scaling = 0.1
 
 emission_sigma = emission_fwhm * 1.0 / (2*np.sqrt(2*np.log(2)))
 
@@ -88,7 +88,7 @@ def sim_data_to_visualization(sim_data, outfile=None):
 Load and truncate the object
 """
 print "Loading resolution_target.tif..."
-actual_object = tif_to_array('resolution_target_qbf.tif'
+actual_object = tif_to_array('resolution_target.tif'
                              )[0, :, :].astype(np.float64)
 print "Done loading."
 print "Apodizing resolution target..."
@@ -178,6 +178,7 @@ for i in range(num_iterations):
     array_to_tif(estimate.reshape((1,) + estimate.shape
                                   ).astype(np.float32), outfile='estimate.tif')
     print "Done saving."
+    
 ##    raw_input('Hit enter to continue...')
 print "Done deconvolving"
 
