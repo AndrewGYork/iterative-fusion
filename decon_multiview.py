@@ -3,10 +3,10 @@ from simple_tif import tif_to_array, array_to_tif
 from scipy.ndimage import gaussian_filter
 from scipy.signal import fftconvolve
 
-sigmas = ((6, 2),
+sigmas = ((6, 2), #6, 2
           (2, 6))
 num_iterations = 100
-intensity_scaling = 0.003
+intensity_scaling = 0.1 #0.003
 
 ##def construct_psf(density, sigma):
 ##    y = np.arange(density.shape[0]).reshape(density.shape[0], 1)
@@ -62,7 +62,7 @@ def multiview_data_to_visualization(multiview_data, outfile=None):
 Load and truncate the object
 """
 print "Loading resolution_target.tif..."
-actual_object = tif_to_array('resolution_target-2.tif'
+actual_object = tif_to_array('resolution_target.tif'
                              )[0, :, :].astype(np.float64)
 print "Done loading."
 print "Apodizing resolution target..."
@@ -204,4 +204,3 @@ for i in range(num_iterations):
     array_to_tif(estimate.reshape((1,)+estimate.shape).astype(np.float32),
                  'estimate_summed_multiview.tif')
 print "Done deconvolving"
-
